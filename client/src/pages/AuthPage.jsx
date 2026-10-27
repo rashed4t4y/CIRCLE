@@ -1,0 +1,24 @@
+import { useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { ArrowRight, Eye, EyeOff, Feather } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Logo } from '../components/UI';
+export default function AuthPage({ register = false }) {
+  const auth = useAuth();
+  const [form, setForm] = useState({ full_name: '', username: '', email: '', password: '', confirm_password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const change = event => setForm(values => ({ ...values, [event.target.name]: event.target.value }));
+  if (auth.user) return <Navigate to="/" replace />;
+  async function submit(event) {
+    event.preventDefault(); setError('');
+    if (register && form.password !== form.confirm_password) { setError('Your passwords don’t match. Please try again.'); return; }
+    setBusy(true);
+    try { if (register) await auth.register(form); else await auth.login({ email: form.email, password: form.password }); }
+    catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+  return <div className="auth-layout"><section className="auth-story"><Logo /><div className="auth-story-content"><span className="eyebrow"><span className="tiny-dot" />GOOD THINGS BEGIN WITH CONNECTION</span><h1>Your people.<br />Your space.<br /><em>Your Circle.</em></h1><p>For the ideas you can’t keep to yourself.<br />And the people who just get it.</p><div className="auth-art" aria-hidden="true"><div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><span className="art-dot dot-one" /><span className="art-dot dot-two" /><div className="art-note"><Feather size={26} /><span>Less noise.<br /><strong>More connection.</strong></span></div><span className="art-spark">✳</span></div></div><span className="auth-story-footer">A little more human. A lot more you.</span></section><main className="auth-main"><div className="auth-mobile-logo"><Logo /></div><div className="auth-form-wrap"><span className="eyebrow">{register ? 'FIND YOUR PEOPLE' : 'MAKE YOURSELF AT HOME'}</span><h2>{register ? 'Your circle starts here.' : 'Good to see you again.'}</h2><p className="auth-subtitle">{register ? 'A fresh perspective. A new connection. A place for you.' : 'Step into your space. There’s a lot to catch up on.'}</p><form onSubmit={submit} className="auth-form">{register && <><div className="field"><label htmlFor="full-name">Full name</label><input id="full-name" name="full_name" autoComplete="name" required maxLength={80} value={form.full_name} onChange={change} placeholder="Your full name" /></div><div className="field"><label htmlFor="username">Username</label><input id="username" name="username" autoComplete="username" required minLength={3} maxLength={24} pattern="[a-zA-Z0-9_]+" title="Use 3–24 letters, numbers, or underscores" value={form.username} onChange={change} placeholder="yourname" /><small>3–24 letters, numbers, or underscores.</small></div></>}<div className="field"><label htmlFor="email">Email address</label><input id="email" type="email" name="email" autoComplete="email" required maxLength={254} value={form.email} onChange={change} placeholder="you@example.com" /></div><div className="field"><label htmlFor="password">Password</label><div className="password-input"><input id="password" type={showPassword ? 'text' : 'password'} name="password" autoComplete={register ? 'new-password' : 'current-password'} minLength={register ? 10 : undefined} maxLength={72} required value={form.password} onChange={change} placeholder={register ? 'At least 10 characters' : 'Enter your password'} /><button type="button" className="icon-button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(value => !value)}>{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></div></div>{register && <div className="field"><label htmlFor="confirm-password">Confirm password</label><input id="confirm-password" type={showPassword ? 'text' : 'password'} name="confirm_password" autoComplete="new-password" required minLength={10} maxLength={72} value={form.confirm_password} onChange={change} placeholder="One more time" /></div>}{error && <p className="form-error" role="alert">{error}</p>}<button className="button button-primary auth-submit" disabled={busy} type="submit">{busy ? 'One moment…' : register ? 'Create your account' : 'Step into CIRCLE'}<ArrowRight size={18} /></button></form><p className="auth-switch">{register ? 'Already found your circle?' : 'New around here?'} <Link to={register ? '/login' : '/register'}>{register ? 'Log in' : 'Join CIRCLE'}</Link></p><div className="auth-note"><span className="tiny-dot" />Your people. Your space. Your Circle.</div></div><p className="auth-copyright">© {new Date().getFullYear()} CIRCLE. A place to belong.</p></main></div>;
+}
+
