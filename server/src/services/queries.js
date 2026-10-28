@@ -3,7 +3,7 @@ import { HttpError } from './validation.js';
 
 // Internal SQL fragments only. All user-supplied values use SQL parameters.
 // Counts are subqueries in one database round trip, not per-user API calls.
-export const userColumns = `u.id, u.full_name, u.username, u.bio, u.avatar_url, u.created_at,
+export const userColumns = `u.id, u.full_name, u.username, u.bio, u.avatar_url, u.cover_url, u.created_at,
   (SELECT count(*)::int FROM posts p WHERE p.user_id = u.id) AS posts_count,
   (SELECT count(*)::int FROM follows f WHERE f.following_id = u.id) AS followers_count,
   (SELECT count(*)::int FROM follows f WHERE f.follower_id = u.id) AS following_count,

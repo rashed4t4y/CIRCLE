@@ -4,7 +4,7 @@ export class ApiError extends Error {
 export async function api(path, { method = 'GET', body, signal } = {}) {
   let response;
   try {
-    response = await fetch(`/api${path}`, { method, credentials: 'include', signal, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
+    response = await fetch(`/api${path}`, { method, credentials: 'include', signal, headers: body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : undefined, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined });
   } catch (error) {
     if (error.name === 'AbortError') throw error;
     throw new ApiError('We couldn’t reach CIRCLE. Check your connection and try again.', 0);
@@ -14,7 +14,7 @@ export async function api(path, { method = 'GET', body, signal } = {}) {
     if (response.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('circle:session-expired'));
     throw new ApiError(result.error?.message || 'Something went wrong. Please try again.', response.status, result.error?.fields);
   }
-  if (method !== 'GET') window.dispatchEvent(new Event('circle:changed'));
+  if (method !== 'GET') window.dispatchEvent(new Event(path.startsWith('/conversations') ? 'circle:messages' : 'circle:changed'));
   return result;
 }
 export function relativeTime(value) {

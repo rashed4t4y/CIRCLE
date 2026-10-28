@@ -1,9 +1,12 @@
+import { mediaRoutes } from './media.js';
+import { removeImage } from '../services/media.js';
 import { Router } from 'express';
 import { pool, transaction } from '../db.js';
 import { getUser, userColumns, notify } from '../services/queries.js';
 import { HttpError, bodyObject, textField, username, imageUrl, id, pagination, listResult, searchTerm, likePattern } from '../services/validation.js';
 
 export const userRoutes = Router();
+userRoutes.use(mediaRoutes);
 
 userRoutes.get('/search', async (req, res) => {
   const q = searchTerm(req.query.q);
@@ -24,10 +27,16 @@ userRoutes.patch('/me', async (req, res) => {
   if (Object.hasOwn(body, 'bio')) add('bio', textField(body.bio, 'bio', { min: 0, max: 240 }));
   if (Object.hasOwn(body, 'avatar_url')) add('avatar_url', imageUrl(body.avatar_url, 'avatar_url'));
   if (!updates.length) throw new HttpError(400, 'Supply full_name, bio, or avatar_url to update your profile.');
+  let oldAvatar;
   const user = await transaction(async (client) => {
+    if (Object.hasOwn(body, 'avatar_url')) {
+      const previous = await client.query('SELECT avatar_url FROM users WHERE id=$1 FOR UPDATE', [req.userId]);
+      oldAvatar = previous.rows[0]?.avatar_url;
+    }
     await client.query('UPDATE users SET ' + updates.join(', ') + ', updated_at = now() WHERE id = $1', values);
     return getUser(req.userId, req.userId, client, true);
   });
+  if (oldAvatar && oldAvatar !== user.avatar_url) await removeImage(oldAvatar);
   res.json({ data: user });
 });
 

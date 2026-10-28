@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { createDatabasePool, connectDatabase } from './connection.js';
 
 // Add new SQL migration files here. Never edit an already-applied migration.
-const migrations = [{ version: '001_initial', file: new URL('./schema.sql', import.meta.url) }];
+const migrations = [
+  { version: '001_initial', file: new URL('./schema.sql', import.meta.url) },
+  { version: '002_profile_media', file: new URL('./002_profile_media.sql', import.meta.url) },
+  { version: '003_messaging', file: new URL('./003_messaging.sql', import.meta.url) },
+];
 let pool;
 let client;
 

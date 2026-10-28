@@ -9,3 +9,7 @@ work/
 outputs/
 .DS_Store
 Thumbs.db
+
+server/uploads/
+test-results/
+playwright-report/

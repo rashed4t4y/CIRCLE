@@ -11,10 +11,11 @@ A complete React/Vite JavaScript frontend, Express REST API, and PostgreSQL data
 - Posts (500 characters), optional image URLs, editing and confirmed deletion.
 - Likes, comments (1,000 characters), ownership checks.
 - Debounced people search, suggestions, hashtag discovery, follow/unfollow and relationship lists.
-- Profiles, join date and counts; name, bio (240 characters), avatar editing.
+- Profiles, join date and counts; name and bio editing; uploaded profile and cover photos with previews, replacement, and removal.
+- Private one-to-one messaging, inbox, unread badges, read receipts, paginated history, and authenticated Socket.IO updates.
 - Persistent like/follow/comment notifications and read/unread controls.
 - Accessible dialogs, toasts, mobile navigation and branded 404.
-- All social content comes from the API and PostgreSQL. URLs display images; files are not uploaded.
+- All social content comes from the API and PostgreSQL. Profile images use local server storage; post images continue to use URLs.
 
 ## Windows setup
 
@@ -119,6 +120,7 @@ Passwords must contain at least 10 characters and at most 72 UTF-8 bytes; choose
 | NODE_ENV | development, test, or production. |
 | DEMO_PASSWORD | Required for optional demo seed only. |
 | DATABASE_SSL | true enables verified PostgreSQL TLS; default false. |
+| UPLOAD_DIR | Optional absolute image storage directory; defaults to server/uploads. Must be writable and persistent. |
 | SESSION_DAYS | Session lifetime, 1–30 days; default 7. |
 
 ## Project structure and files created
@@ -180,6 +182,8 @@ The starting folder contained only work and outputs. Application files are new. 
 | follows | Two user FKs; unique pair; self-follow prohibited. |
 | notifications | Recipient/actor user FKs; post/comment references; typed activity. |
 | sessions | SHA-256 hash of random cookie token; user FK and expiration. |
+| conversations | Ordered user pair with a unique constraint; one conversation per pair. |
+| messages | Conversation, sender and recipient FKs; content, retry UUID, TIMESTAMPTZ creation/read times. |
 | schema_migrations | Applied versions and checksums. |
 
 Foreign keys cascade dependent social records when parents are deleted. Timestamps use TIMESTAMPTZ. Indexes cover feeds, authors, comments, follows, notifications and sessions. Counts are computed in SQL in the same round trip. User values are parameterized. Transactions keep social mutations and notifications consistent, with follow-pair advisory locking.
@@ -198,6 +202,7 @@ Success: {data: ...}. Lists also return pagination: {page, limit, has_more}. Err
 | POST | /api/auth/logout | Revokes session and clears cookie. |
 | GET | /api/auth/me | Current profile including own email. |
 | GET | /api/users/search?q= | Name/username search; empty q gives suggestions. |
+| POST | /api/users/me/media | Multipart full_name, bio, avatar, cover, remove_avatar=true, remove_cover=true; saves atomically. |
 | GET | /api/users/:username | Public profile and counts. |
 | PATCH | /api/users/me | full_name, bio, avatar_url. |
 | GET | /api/users/:username/followers | Paginated followers. |
@@ -216,18 +221,22 @@ Success: {data: ...}. Lists also return pagination: {page, limit, has_more}. Err
 | GET | /api/notifications | Activity plus top-level unread_count. |
 | PATCH | /api/notifications/:id/read | Mark your notification read. |
 | PATCH | /api/notifications/read-all | Mark all your notifications read. |
+| GET / POST | /api/conversations | Paginated inbox / create or reuse a pair with user_id. |
+| GET | /api/conversations/unread | Total unread message count. |
+| GET | /api/conversations/:id | Other participant; membership required. |
+| GET | /api/conversations/:id/messages | Chronological page; optional before message ID and limit (1–50, default 30). |
+| POST | /api/conversations/:id/messages | content (1–4000 characters), client_id (v4 UUID); retries reuse the same identifier. |
+| PATCH | /api/conversations/:id/read | through_id from this conversation; marks only the caller’s received messages through that cursor. |
 | GET | /api/topics | Hashtags from the last 90 days. |
 
 Every mutation, including login/register, requires an exact allowed Origin. Browsers supply it automatically. CLI clients must send Origin: http://localhost:5173 (or configured origin), JSON Content-Type when sending bodies, and retain cookies.
 
 ## Tests
 
-Migrate the separate test database, then run tests. This temporary environment override leaves .env unchanged:
+Migrate the separately configured TEST_DATABASE_URL, then run tests. This command rejects a missing test URL or one identical to DATABASE_URL and leaves .env unchanged:
 
 ~~~powershell
-$env:DATABASE_URL = 'postgresql://circle_app:YOUR_URL_ENCODED_PASSWORD@localhost:5432/circle_test'
-npm.cmd run db:migrate
-$env:DATABASE_URL = $null
+npm.cmd run db:migrate:test
 npm.cmd test
 npm.cmd run build
 ~~~
@@ -238,7 +247,7 @@ Tests create randomly named users and clean up only their own records. Without T
 
 Sessions use random opaque tokens stored as hashes, HttpOnly SameSite=Lax cookies and Secure in production. The verified session supplies identity. Exact Origin checks protect mutations. Bcrypt cost 12, rate limits, bounded JSON bodies, server validation, parameterized SQL, authorization and Helmet headers are included. Public responses never expose hashes or other users' emails.
 
-This portfolio app does not implement email verification, password recovery, moderation/reporting, file upload or realtime sockets. Notifications refresh after actions and every 30 seconds. Rate limits are process-local; multiple production instances need a shared limiter. Hosting/TLS, backups and monitoring remain deployment responsibilities. No commits, pushes or deployments were made.
+This portfolio app does not implement email verification, password recovery, or moderation/reporting. Notifications refresh after actions and every 30 seconds. Rate limits are process-local; multiple production instances need a shared limiter. Hosting/TLS, backups and monitoring remain deployment responsibilities. No commits, pushes or deployments were made.
 
 ## Troubleshooting
 
@@ -254,3 +263,45 @@ This portfolio app does not implement email verification, password recovery, mod
 - Remote image unavailable: check the URL/network; URL images depend on the remote host.
 
 References: [Vite](https://vite.dev/guide/), [Express security](https://expressjs.com/en/advanced/best-practice-security/), [node-postgres parameterized SQL](https://node-postgres.com/features/queries).
+
+## Profile media and messaging setup
+
+Install dependencies with npm.cmd install, apply npm.cmd run db:migrate, then restart the API and frontend with npm.cmd run dev. The migration ledger applies 002_profile_media and 003_messaging after the unchanged initial schema. No existing tables are dropped. Seeding remains optional and compatible; it is not needed to enable these features.
+
+The server adds Multer for bounded multipart parsing, Sharp for actual image decoding and WebP re-encoding, and Socket.IO. The client adds socket.io-client; the server also uses it as a development dependency for real socket integration tests.
+
+### Profile images
+
+Open your own profile, choose Edit profile, select photos, review previews, and Save changes. Removal is staged until Save. Cancel discards staged changes. Object URLs are revoked on replacement or modal close. Missing photos use the existing initials and illustrated cover.
+
+Uploads accept JPEG, PNG, or WebP, up to 5 MiB per image and 40 million decoded pixels; animated images are rejected. The server validates decoded content, strips metadata through re-encoding, and generates unique WebP filenames. PostgreSQL stores relative /uploads/ URLs. Name, bio, and media changes in the multipart form commit together; failed saves clean up new files, and successful replacements/removals clean up old managed files. Legacy avatar URL updates remain supported by PATCH /api/users/me.
+
+Images are publicly readable profile assets, served with safe static path handling and immutable caching. Never put private documents or other files in the upload directory. The directory is created automatically and ignored by Git. Optional UPLOAD_DIR should be an absolute path outside the source checkout on a persistent volume. Back up both PostgreSQL and this directory.
+
+Local disk is suitable for development or a single server with persistent storage. Ephemeral/serverless hosting such as Vercel cannot reliably preserve uploads across deployments or restarts. Multiple API instances also need shared persistent storage. The saveImage/removeImage storage boundary in server/src/services/media.js can be replaced with an object-storage adapter. Interrupted processes or disk cleanup failures can leave orphan files; cleanup failures log only an error code and do not roll back a committed profile.
+
+### Private messaging
+
+Choose Message on another user's profile. The unique ordered participant pair ensures concurrent requests reuse one conversation. The Messages navigation item shows unread counts on desktop and mobile. Open a chat to mark received messages through the loaded cursor as read; later arrivals stay unread until the next view update. Hidden tabs do not mark messages read. Enter sends, Shift+Enter inserts a newline, and failed sends retain the draft and retry UUID to avoid duplicates.
+
+All content reads and writes use the existing cookie-authenticated, origin-protected REST API. Socket.IO verifies the same hashed session against PostgreSQL on connection, rechecks it and conversation membership before each delivery, and periodically disconnects expired sessions. It sends only conversation:changed invalidations to the two participants; clients cannot join arbitrary rooms or submit messaging commands through sockets. Clients then load persisted content and unread/read state through the API. Reconnect and tab visibility refresh the database state, with a 30-second reconciliation interval as a fallback.
+
+The Vite proxy forwards /api, /uploads, and /socket.io (including WebSocket upgrades). A production reverse proxy must also forward /socket.io and support WebSocket upgrades. The compiled app supports same-origin hosting. Socket.IO and rate limits currently run in one API process; scaling out needs a shared Socket.IO adapter, shared limits, and shared image storage.
+
+Profile media changes are limited to 30 per user per 15 minutes. Conversation creation/message sends share a 60-per-user-per-minute limit, in addition to the existing API limit. Private text is never logged or globally broadcast. This is access-controlled messaging, not end-to-end encryption.
+
+### Verification
+
+Run:
+
+~~~powershell
+npm.cmd run db:migrate
+npm.cmd run db:migrate:test
+npm.cmd test
+npm.cmd run build
+npm.cmd run dev
+~~~
+
+Tests use randomly named fixtures in the separate test database and delete only their own records. Media tests use a temporary isolated upload directory. Messaging tests exercise real HTTP and Socket.IO connections, including unauthorized access, duplicate creation/send races, cursors, read races, reconnects, and revoked sessions.
+
+Browser checks use headless Microsoft Edge by default (Windows) and serve the production build on a temporary port against TEST_DATABASE_URL. Run npm.cmd run test:browser after the build. If Edge is unavailable, install a Playwright browser and set PLAYWRIGHT_CHANNEL to its installed channel (for example chromium). The tests create and remove only their own accounts and temporary uploads. Screenshots and reports are ignored by Git.

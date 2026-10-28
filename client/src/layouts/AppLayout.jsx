@@ -1,6 +1,7 @@
+import { useMessaging } from '../context/MessagingContext';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowUpRight, Bell, CircleHelp, Compass, Feather, Home, LogOut, Plus, Search, Sparkles, UserRound } from 'lucide-react';
+import { ArrowUpRight, MessageCircle, Bell, CircleHelp, Compass, Feather, Home, LogOut, Plus, Search, Sparkles, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useResource } from '../hooks/useApi';
@@ -8,8 +9,9 @@ import { Avatar, ErrorState, Logo, Modal, UserCard } from '../components/UI';
 import { PostComposer } from '../components/PostComposer';
 function Navigation({ unread, onCompose, mobile = false }) {
   const { user } = useAuth();
-  const items = [{ to: '/', label: 'Home', Icon: Home, end: true }, { to: '/explore', label: 'Explore', Icon: Compass }, { to: '/notifications', label: 'Notifications', Icon: Bell }, { to: `/u/${user.username}`, label: 'Profile', Icon: UserRound }];
-  return <nav className={mobile ? 'mobile-nav' : 'main-nav'} aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>{items.map(({ to, label, Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}><span className="nav-icon"><Icon size={21} />{label === 'Notifications' && unread > 0 && <span className="notification-badge">{unread > 99 ? '99+' : unread}</span>}</span><span>{label}</span>{label === 'Home' && <span className="nav-active-dot" />}</NavLink>)}{mobile && <button className="nav-link mobile-compose" onClick={onCompose}><Plus size={22} /><span>Create</span></button>}</nav>;
+  const { unread: messageUnread } = useMessaging();
+  const items = [{ to: '/', label: 'Home', Icon: Home, end: true }, { to: '/explore', label: 'Explore', Icon: Compass }, { to: '/messages', label: 'Messages', Icon: MessageCircle }, { to: '/notifications', label: 'Notifications', Icon: Bell }, { to: `/u/${user.username}`, label: 'Profile', Icon: UserRound }];
+  return <nav className={mobile ? 'mobile-nav' : 'main-nav'} aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>{items.map(({ to, label, Icon, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}><span className="nav-icon"><Icon size={21} />{label === 'Messages' && messageUnread > 0 && <span className="notification-badge">{messageUnread > 99 ? '99+' : messageUnread}</span>}{label === 'Notifications' && unread > 0 && <span className="notification-badge">{unread > 99 ? '99+' : unread}</span>}</span><span>{label}</span>{label === 'Home' && <span className="nav-active-dot" />}</NavLink>)}{mobile && <button className="nav-link mobile-compose" onClick={onCompose}><Plus size={22} /><span>Create</span></button>}</nav>;
 }
 function RightSidebar() {
   const people = useResource('/users/search?limit=3');

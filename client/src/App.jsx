@@ -1,3 +1,5 @@
+import MessagesPage from './pages/MessagesPage';
+import { MessagingProvider } from './context/MessagingContext';
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -18,5 +20,5 @@ function SessionGate() {
 }
 function ProtectedRoute() { return useAuth().user ? <Outlet /> : <Navigate to="/login" replace />; }
 export default function App() {
-  return <BrowserRouter><ToastProvider><AuthProvider><Routes><Route element={<SessionGate />}><Route path="/login" element={<AuthPage key="login" />} /><Route path="/register" element={<AuthPage key="register" register />} /><Route element={<ProtectedRoute />}><Route element={<AppLayout />}><Route index element={<HomePage />} /><Route path="explore" element={<ExplorePage />} /><Route path="notifications" element={<NotificationsPage />} /><Route path="u/:username" element={<ProfilePage />} /><Route path="u/:username/followers" element={<ConnectionsPage type="followers" />} /><Route path="u/:username/following" element={<ConnectionsPage type="following" />} /><Route path="posts/:id" element={<PostDetailsPage />} /></Route></Route><Route path="*" element={<NotFoundPage />} /></Route></Routes></AuthProvider></ToastProvider></BrowserRouter>;
+  return <BrowserRouter><ToastProvider><AuthProvider><Routes><Route element={<SessionGate />}><Route path="/login" element={<AuthPage key="login" />} /><Route path="/register" element={<AuthPage key="register" register />} /><Route element={<ProtectedRoute />}><Route element={<MessagingProvider><AppLayout /></MessagingProvider>}><Route index element={<HomePage />} /><Route path="explore" element={<ExplorePage />} /><Route path="messages" element={<MessagesPage />} /><Route path="messages/:conversationId" element={<MessagesPage />} /><Route path="notifications" element={<NotificationsPage />} /><Route path="u/:username" element={<ProfilePage />} /><Route path="u/:username/followers" element={<ConnectionsPage type="followers" />} /><Route path="u/:username/following" element={<ConnectionsPage type="following" />} /><Route path="posts/:id" element={<PostDetailsPage />} /></Route></Route><Route path="*" element={<NotFoundPage />} /></Route></Routes></AuthProvider></ToastProvider></BrowserRouter>;
 }

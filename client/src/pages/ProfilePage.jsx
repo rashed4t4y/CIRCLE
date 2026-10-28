@@ -1,32 +1,27 @@
+import EditProfile, { CoverImage } from '../components/EditProfile';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, Pencil } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useCollection, useResource } from '../hooks/useApi';
 import { api } from '../services/api';
-import { Avatar, EmptyState, ErrorState, FollowButton, LoadMore, Modal, Skeleton, UserCard } from '../components/UI';
+import { Avatar, EmptyState, ErrorState, FollowButton, LoadMore, Skeleton, UserCard } from '../components/UI';
 import { PostFeed } from './HomePage';
-function EditProfile({ person, onClose }) {
-  const { setUser } = useAuth();
-  const toast = useToast();
-  const [form, setForm] = useState({ full_name: person.full_name, bio: person.bio || '', avatar_url: person.avatar_url || '' });
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  const change = event => setForm(values => ({ ...values, [event.target.name]: event.target.value }));
-  async function submit(event) {
-    event.preventDefault(); setBusy(true); setError('');
-    try { const result = await api('/users/me', { method: 'PATCH', body: { ...form, avatar_url: form.avatar_url.trim() || null } }); setUser(result.data); toast('Profile updated. Looking like you.'); onClose(); }
-    catch (err) { setError(err.message); }
-    finally { setBusy(false); }
-  }
-  return <Modal title="Make it yours" onClose={onClose}><form className="profile-form" onSubmit={submit}><Avatar user={{ ...person, ...form }} size="large" /><div className="field"><label htmlFor="edit-name">Full name</label><input id="edit-name" name="full_name" required maxLength={80} value={form.full_name} onChange={change} /></div><div className="field"><label htmlFor="edit-bio">A little about you</label><textarea id="edit-bio" name="bio" rows={4} maxLength={240} value={form.bio} onChange={change} placeholder="What makes you, you?" /><small>{form.bio.length}/240</small></div><div className="field"><label htmlFor="edit-avatar">Avatar URL <span className="muted">(optional)</span></label><input id="edit-avatar" name="avatar_url" type="url" maxLength={2048} value={form.avatar_url} onChange={change} placeholder="https://example.com/your-avatar.jpg" /><small>Leave blank for your initials. Use an image you have permission to share.</small></div>{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button type="button" onClick={onClose} className="button button-secondary" disabled={busy}>Cancel</button><button type="submit" className="button button-primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div></form></Modal>;
-}
 export function ProfileHeader({ person }) {
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [messaging, setMessaging] = useState(false);
+  async function message() {
+    setMessaging(true);
+    try { const result = await api('/conversations', { method: 'POST', body: { user_id: person.id } }); navigate('/messages/' + result.data.id); }
+    catch (error) { toast(error.message, 'error'); }
+    finally { setMessaging(false); }
+  }
   const own = String(user.id) === String(person.id);
-  return <section className="card profile-header"><div className="profile-cover"><div /><div /><span>YOUR PEOPLE. YOUR SPACE.</span></div><div className="profile-body"><div className="profile-top"><Avatar user={person} size="large" />{own ? <button className="button button-secondary button-small" onClick={() => setEditing(true)}><Pencil size={15} />Edit profile</button> : <FollowButton person={person} />}</div><h1>{person.full_name}</h1><p className="profile-username">@{person.username}</p><p className="profile-bio">{person.bio || 'A new face. A fresh perspective.'}</p><p className="profile-joined"><CalendarDays size={15} />Joined {new Date(person.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</p><div className="profile-stats"><span><strong>{person.posts_count}</strong> thoughts</span><Link to={`/u/${person.username}/followers`}><strong>{person.followers_count}</strong> followers</Link><Link to={`/u/${person.username}/following`}><strong>{person.following_count}</strong> following</Link></div></div>{editing && <EditProfile person={person} onClose={() => setEditing(false)} />}</section>;
+  return <section className="card profile-header"><CoverImage url={person.cover_url} /><div className="profile-body"><div className="profile-top"><Avatar user={person} size="large" />{own ? <button className="button button-secondary button-small" onClick={() => setEditing(true)}><Pencil size={15} />Edit profile</button> : <div className="profile-actions"><button className="button button-secondary button-small" disabled={messaging} onClick={message}>{messaging ? 'Opening…' : 'Message'}</button><FollowButton person={person} /></div>}</div><h1>{person.full_name}</h1><p className="profile-username">@{person.username}</p><p className="profile-bio">{person.bio || 'A new face. A fresh perspective.'}</p><p className="profile-joined"><CalendarDays size={15} />Joined {new Date(person.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</p><div className="profile-stats"><span><strong>{person.posts_count}</strong> thoughts</span><Link to={`/u/${person.username}/followers`}><strong>{person.followers_count}</strong> followers</Link><Link to={`/u/${person.username}/following`}><strong>{person.following_count}</strong> following</Link></div></div>{editing && <EditProfile person={person} onClose={() => setEditing(false)} />}</section>;
 }
 export default function ProfilePage() {
   const { username } = useParams();

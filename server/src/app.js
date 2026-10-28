@@ -1,3 +1,5 @@
+import { messageRoutes } from './routes/messages.js';
+import { uploadDirectory } from './services/media.js';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -21,9 +23,9 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'https:', 'http:', 'data:'],
+      imgSrc: ["'self'", 'https:', 'http:', 'data:', 'blob:'],
       fontSrc: ["'self'", 'data:'],
-      connectSrc: ["'self'", config.clientOrigin, config.serverOrigin],
+      connectSrc: ["'self'", config.clientOrigin, config.serverOrigin, config.serverOrigin.replace(/^http/, 'ws')],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
       upgradeInsecureRequests: config.production ? [] : null,
@@ -31,6 +33,7 @@ app.use(helmet({
   },
   crossOriginResourcePolicy: { policy: 'same-site' },
 }));
+app.use('/uploads', express.static(uploadDirectory, { dotfiles: 'deny', index: false, fallthrough: false, maxAge: '1y', immutable: true }));
 app.use('/api', protectOrigin);
 app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 app.use(express.json({ limit: '16kb' }));
@@ -52,6 +55,7 @@ app.use('/api/posts', requireAuth, postRoutes);
 app.use('/api/comments', requireAuth, commentRoutes);
 app.use('/api/notifications', requireAuth, notificationRoutes);
 app.use('/api/topics', requireAuth, topicRoutes);
+app.use('/api/conversations', requireAuth, messageRoutes);
 app.use('/api', (req, res, next) => next(new HttpError(404, 'API endpoint not found.')));
 
 const clientDirectory = fileURLToPath(new URL('../../client/dist/', import.meta.url));

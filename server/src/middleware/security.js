@@ -37,6 +37,7 @@ export async function requireAuth(req, res, next) {
 export function errorHandler(error, req, res, next) {
   if (res.headersSent) return next(error);
   if (error instanceof HttpError) return res.status(error.status).json({ error: { message: error.message, ...(error.fields ? { fields: error.fields } : {}) } });
+  if (req.path.startsWith('/uploads/') && [403, 404].includes(error.status)) return res.sendStatus(error.status);
   if (error.type === 'entity.parse.failed') return res.status(400).json({ error: { message: 'The request contains invalid JSON.' } });
   if (error.type === 'entity.too.large') return res.status(413).json({ error: { message: 'This request is too large.' } });
   if (error.code === '23505') return res.status(409).json({ error: { message: 'This username or email is already in use.' } });

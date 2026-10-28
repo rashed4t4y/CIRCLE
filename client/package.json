@@ -9,13 +9,14 @@
     "preview": "vite preview --host localhost"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.9.4",
-    "lucide-react": "^0.468.0"
+    "socket.io-client": "^4.8.4"
   },
   "devDependencies": {
-    "vite": "^7.1.9",
-    "@vitejs/plugin-react": "^5.0.4"
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.9"
   }
 }
